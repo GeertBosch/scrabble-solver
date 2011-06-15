@@ -1,103 +1,21 @@
 pragma Ada_2012;
-with Ada.Text_IO;      use Ada.Text_IO;
+with Ada.Text_IO; use Ada;
 with Ada.Command_Line; use Ada.Command_Line;
+with Textfun; use Textfun;
+
 procedure Anagram is
 
-   --  Simple string predicates
+   Board_Size : constant := 15;
 
-   function Empty (S : String) return Boolean is (S'Last < S'First);
-   --  Return True iff S is empty;
+   Tiles : constant String := 
+      9 * 'A' & 2 * 'B' & 2 * 'C' & 4 * 'D' & 12 * 'E' & 2 * 'F' & 3 * 'G'
+    & 2 * 'H' & 9 * 'I' & 1 * 'J' & 1 * 'K' & 4 * 'L' & 2 * 'M' & 6 * 'N' 
+    & 8 * 'O' & 2 * 'P' & 1 * 'Q' & 6 * 'R' & 4 * 'S' & 6 * 'T' & 4 * 'U'
+    & 2 * 'V' & 2 * 'W' & 1 * 'X' & 2 * 'Y' & 1 * 'Z';
 
-   --  String constructors
+   subtype Board_String is String (1 .. Board_Size**2);
 
-   function "*" (Left : Natural; Right : Character) return String is
-     (1 .. Left => Right);
-   function Space (N : Natural) return String is (N * ' ');
-
-   --  Index computations
-
-   function Middle (S : String) return Natural is
-     (if S'Last < S'First then S'First - 1
-      else S'First + (S'Last - S'First) / 2);
-
-   --  Select parts of strings
-
-   --  The Head and Tail functions allow for easy iteration by recursion.
-   --  Note that Head requires S to be non-empty. Because Tail has O (N) time
-   --  complexity and iteration has O (N) recursion depth, this way of
-   --  iteration results in quadratic complexity in both time and space.
-
-   function Head (S : String) return Character is (S (S'First));
-
-   function Tail (S : String) return String is
-     (if S'Last <= S'First then "" else S (S'First + 1 .. S'Last));
-
-   --  The single argument form of Left and Right allows for convenient
-   --  splitting of strings in half. When used for recursive iteration, this
-   --  limits recursion depth to O (log N), and total time and space complexity
-   --  will be O (N log N). For odd length, Left returns the longer part.
-
-   function Left (S : String) return String is (S (S'First .. Middle (S)));
-   function Right (S : String) return String is (S (Middle (S) + 1 .. S'Last));
-
-   pragma Assert (Left ("Hello") = "Hel" and Left ("World!") = "Wor");
-   pragma Assert (Right ("Hello") = "lo" and Right ("World!") = "ld!");
-
-   function Left (S : String; N : Natural) return String is
-     (if S'Length < N then S & Space (N - S'Length)
-      else S (S'First .. S'First - 1 + N));
-
-   function "-" (Left, Right : Character) return Integer is
-     (Character'Pos (Left) - Character'Pos (Right));
-
-   function "+" (Left : Character; Right : Integer) return Character is
-     (Character'Val (Character'Pos (Left) + Right));
-
-   function Upcase (C : Character) return Character is
-     (if C in 'a' .. 'z' then C + ('A' - 'a') else C);
-   pragma Assert (Upcase ('a') = 'A');
-   pragma Assert (Upcase ('A') = 'A');
-   pragma Assert (Upcase ('3') = '3');
-
-   function Upcase (S : String) return String is
-     (if Empty (S) then S else Upcase (Head (S)) & Upcase (Tail (S)));
-   pragma Assert (Upcase ("Hello, World!") = "HELLO, WORLD!");
-
-   function Count (S : String; C : Character) return Natural is
-     (if S'Last < S'First then 0
-      else Boolean'Pos (Head (S) = C) + Count (Tail (S), C));
-
-   function Has (S : String; C : Character) return Boolean is
-      (not Empty (S) and then (Head (S) = C or else Has (Tail (S), C)));
-   pragma Assert (Has ("*sha*mater", '*'));
-
-   function Non_Blanks (S : String) return String is
-     (if Empty (S) then ""
-      elsif Head (S) in ' ' | '?' then Non_Blanks (Tail (S))
-      else Head (S) & Non_Blanks (Tail (S)));
-
-   function Middle (S : String) return Character is (S (Middle (S)));
-
-   function Insert (S : String; C : Character) return String is
-     (if Empty (S) then (S'First => C)
-      elsif C >= Middle (S) then Left (S) & Insert (Right (S), C)
-      else Insert (S (S'First .. Middle (S) - 1), C) & Middle (S) & Right (S));
-   pragma Assert (Insert ("Hllo", 'e') = "Hello");
-
-   function Sort (S : String) return String is
-     (if Empty (S) then S else Insert (Sort (Tail (S)), Head (S)));
-   pragma Assert (Sort ("HELLO WORLD") = " DEHLLLOORW");
-
-   function Match (Word : String; Pattern : String) return Boolean is
-     (if Pattern = "" then Word = ""
-      elsif Word = "" then Pattern = "*"
-      elsif Head (Pattern) = '*' then Match (Word, Tail (Pattern))
-                                        or else Match (Tail (Word), Pattern)
-      elsif Head (Pattern) not in Head (Word) | '?' then False
-      else Match (Tail (Word), Tail (Pattern)));
-   pragma Assert (Match ("Hello", "H?*o"));
-   pragma Assert (Match ("snail", "*na*"));
-   pragma Assert (not Match ("World", "W*?orld"));
+   Error_Exit : exception;
 
    function Match_Rack
      (Word    : String;
@@ -118,79 +36,168 @@ procedure Anagram is
 
    subtype Letter is Character range 'A' .. 'Z';
 
+   function "-" (Left, Right : String) return String is
+     (if Left = "" or else Right = "" then Left
+      elsif Head (Left) = Head (Right) then Tail (Left) - Tail (Right)
+      else Head (Left) & (Tail (Left) - Right));
+
    function Score (C : Character) return Natural is
      (if not (C in Letter) then 0
       else (case Letter (C) is
-            when 'A' | 'E' | 'I'
-               | 'L' | 'N' | 'O'
-               | 'R' | 'S' | 'T'
-               | 'U'             =>  1,
-            when 'D' | 'G'       =>  2,
-            when 'B' | 'C' | 'P'
-               | 'M'             =>  3,
-            when 'F' | 'H' | 'V'
-               | 'W' | 'Y'       =>  4,
-            when 'K'             =>  5,
-            when 'J' | 'X'       =>  8,
-            when 'Q' | 'Z'       => 10));
+            when 'A' | 'E' | 'I' | 'L' | 'N' 
+               | 'O' | 'R' | 'S' | 'T' | 'U' =>  1,
+            when 'D' | 'G'                   =>  2,
+            when 'B' | 'C' | 'P' | 'M'       =>  3,
+            when 'F' | 'H' | 'V' | 'W' | 'Y' =>  4,
+            when 'K'                         =>  5,
+            when 'J' | 'X'                   =>  8,
+            when 'Q' | 'Z'                   => 10));
 
    function Score (S : String) return Natural is
      (if Empty (S) then 0 else Score (Head (S)) + Score (Tail (S)));
 
    function Scrabble_Word (S : String) return Boolean is
-     (S'Length in 1 .. 15 and then Match_Rack (Sort (S),
-        9 * 'A' & 2 * 'B' & 2 * 'C' & 4 * 'D' & 12 * 'E'
-      & 2 * 'F' & 3 * 'G' & 2 * 'H' & 9 * 'I' &  1 * 'J'
-      & 1 * 'K' & 4 * 'L' & 2 * 'M' & 6 * 'N' &  8 * 'O'
-      & 2 * 'P' & 1 * 'Q' & 6 * 'R' & 4 * 'S' &  6 * 'T'
-      & 4 * 'U' & 2 * 'V' & 2 * 'W' & 1 * 'X' &  2 * 'Y' & 1 * 'Z', 2));
+     (S'Length in 1 .. 15 and then Match_Rack (Sort (S), Tiles));
 
    function Image (N : Natural) return String is -- No leading blanks
      ((if N < 10 then "" else Image (N / 10)) & ('0' + N));
 
+   function Get_Letters (S : String) return String is
+     (if Empty (S) then "" 
+      elsif Head (S) not in Letter then Get_Letters (Tail (S))
+      else Head (S) & Get_Letters (Tail (S)));
+
    Rack     : constant String := Upcase (Argument (1));
-   pragma Debug (Put_Line ("Rack = " & Rack));
-
-   Wildcard : constant Boolean := Has (Rack, '*');
-   pragma Debug (Put_Line ("Wildcard = " & Wildcard'Img));
-
-   Letters  : constant String := Sort (Non_Blanks (Rack));
-   pragma Debug (Put_Line ("Letters = " & Letters));
-
-   Blanks   : constant Natural := Count (Rack, ' ') + Count (Rack, '?');
-   pragma Debug (Put_Line ("Blanks =" & Blanks'Img));
-
    Pattern  : constant String :=
      (if Argument_Count > 1 then Upcase (Argument (2)) else "*");
-   pragma Debug (Put_Line ("Pattern = " & Pattern));
+   Wildcard : constant Boolean := Has (Rack, '*');
+   Letters  : constant String := Sort (Get_Letters (Rack & Pattern));
+   Blanks   : constant Natural := Count (Rack, ' ') + Count (Rack, '?');
+
+   pragma Debug (Text_IO.Put_Line ("Rack = " & Rack));
+   pragma Debug (Text_IO.Put_Line ("Wildcard = " & Wildcard'Img));
+   pragma Debug (Text_IO.Put_Line ("Letters = " & Letters));
+   pragma Debug (Text_IO.Put_Line ("Blanks =" & Blanks'Img));
+   pragma Debug (Text_IO.Put_Line ("Pattern = " & Pattern));
+
+   use Text_IO;
+
+   function Read_Board (File : File_Type; Rows : Positive) return String is
+     (if Rows = 1 then Left (Get_Line (File), Board_Size)
+      else Left (Get_Line (File), Board_Size) & Read_Board (File, Rows - 1));
+
+   procedure Analyze_Board (Words : String; Board : Board_String) is
+      pragma Debug (Put_Line ("letter=" & Get_Letters (Board)));
+      Used : String := Sort (Get_Letters (Upcase (Board)));
+   begin
+      Put_Line ("Tiles:     " & Tiles);
+      Put_Line ("Used:      " & Used);
+      Put_Line ("Remaining: " & Tiles - Used);
+
+      if not Match_Rack (Used, Tiles) then
+         Put_Line ("illegal board setup");
+         raise Error_Exit;
+      end if;
+   end Analyze_Board;
+
+   function "/" (Left : String; Right : Character) return Natural is
+      Count : Natural := 0;
+   begin
+      for X of Left loop
+         Count := Count + Boolean'Pos (X = Right);
+      end loop;
+
+      return Count;
+   end "/";
+
+   procedure Analyze_Dict (Dict : String) is
+      Spaces  : constant Natural := Dict / ' ';
+      Words   : constant Positive := 1 + Spaces;
+      Letters : constant Natural := Dict'Length - Spaces;
+      Count   : Natural;
+      Percent : Natural;
+   begin
+      Put_Line (Words'Img & " words");
+      for L in Letter loop
+         Count := Dict / L;
+         Percent := 100 * Count / Letters;
+         Put_Line (Count'Img & " * " & L'Img & "," & Percent'Img & "%");
+      end loop;
+   end Analyze_Dict;
+
+   function Read (File : File_Type; Lines : Natural) return String is
+     (if Lines < 1 or else End_Of_File (File) then ""
+      elsif Lines = 1 then Get_Line (File)
+      else Read (File, Lines / 2) & ' ' & Read (File, Lines - Lines / 2));
+
+   function Read (File : File_Type) return String is
+     (Read (File, Natural'Last));
+
+   function Skip (S : String; C : Character) return Positive is
+     (if Empty (S) or else Head (S) /= C then S'First 
+      else Skip (S (S'First + 1 .. S'Last), C));
+   pragma Assert (Skip ("Hello", 'H') = 2);
+   pragma Assert (Skip ("Hello", 'e') = 1);
+   Pragma Assert (Skip ("ssslow", 's') = 4);
+   pragma Assert (Skip ("***", '*') = 4);
+   pragma Assert (Skip ("", ' ') = 1);
+
+   function Skip_To (S : String; C : Character) return Positive is
+     (if S = "" or else Head (S) = C then S'First else Skip_To (Tail (S), C));
+
+   function Backup_Past (S : String; C : Character) return Natural is
+     (if S = "" then S'First - 1
+      elsif S (S'Last) = C then S'Last - 1
+      else Backup_Past (S (S'First .. S'Last - 1), C));
 
    function Filter (Word : String) return Boolean is
      (if Wildcard then Match (Word, Rack)
-      elsif Word'Length - Blanks > Letters'Length then False
       else Match_Rack (Sort (Word), Letters, Blanks)
-        and then Match (Word, Pattern));
+              and then Match (Word, Pattern));
 
-   Input : File_Type;
+   function Filter (List : String; Pattern : String) return String is
+     ("");
+
+   procedure Usage is
+   begin
+      Put_Line (Command_Name & " [rack] pattern");
+      Put_Line (Command_Name & " --board");
+   end Usage;
+
+   Word_File : File_Type;
 
 begin
    begin
-      Open (Input, In_File, "words.txt");
-      Set_Input (Input);
-
+      Open (Word_File, In_File, "words.txt");
    exception
       when Name_Error => null;
       when Use_Error =>
          Put_Line (Standard_Error, "error reading words.txt");
-         Set_Exit_Status (Failure);
+         raise Error_Exit;
    end;
 
-   while not End_Of_File loop
+   if Argument_Count = 0 then
+      Usage;
+
+   elsif Argument (1) = "--board" then
+      Analyze_Board ("", Read_Board (Current_input, Board_Size));
+      return;
+
+   elsif Argument (1) = "--dict" then
+      Analyze_Dict (Read (Word_File));
+      return;
+   end if;
+
+   while not End_Of_File (Word_File) loop
       declare
-         Word : constant String := Get_Line;
+         Word : constant String := Get_Line (Word_File);
       begin
          if Filter (Word) then
             Put_Line (Word & Score (Word)'Img);
          end if;
       end;
    end loop;
+exception
+   when Error_Exit =>
+      Set_Exit_Status (Failure);
 end Anagram;
