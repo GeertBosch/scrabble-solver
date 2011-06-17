@@ -73,6 +73,7 @@ procedure Anagram is
    Wildcard : constant Boolean := Has (Rack, '*');
    Letters  : constant String := Sort (Get_Letters (Rack & Pattern));
    Blanks   : constant Natural := Count (Rack, ' ') + Count (Rack, '?');
+   Max_Len  : constant Positive := Letters'Length + Blanks;
 
    pragma Debug (Text_IO.Put_Line ("Rack = " & Rack));
    pragma Debug (Text_IO.Put_Line ("Wildcard = " & Wildcard'Img));
@@ -152,7 +153,8 @@ procedure Anagram is
 
    function Filter (Word : String) return Boolean is
      (if Wildcard then Match (Word, Rack)
-      else Match_Rack (Sort (Word), Letters, Blanks)
+      else Word'Length <= Max_Len
+              and then Match_Rack (Sort (Word), Letters, Blanks)
               and then Match (Word, Pattern));
 
    function Filter (List : String; Pattern : String) return String is
