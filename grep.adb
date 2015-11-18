@@ -24,10 +24,11 @@ procedure Grep is
 
    function Match (Text : String; Pattern : String) return Boolean is
      (if Pattern = "" then Text = ""
-      elsif Head (Pattern) = '*' then Match (Text, Tail (Pattern))
-      else (Text /= "" and 
-              and then Up (Head (Pattern)) in Up (Head (Text)) | '?' | '*'
-              and then Match (Tail (Text), Tail (Pattern))));
+      elsif Head (Pattern) = '*' then
+        (Text /= "" and then Match (Tail (Text), Pattern))
+        or else Match (Text, Tail (Pattern))
+      else Text /= "" and then Up (Head (Pattern)) in Up (Head (Text)) | '?'
+        and then Match (Tail (Text), Tail (Pattern)));
    --  Returns True if Text matches Pattern, ignoring case. A '?' character
    --  in the pattern matches any character in the input and a '*' chacacter
    --  matches any substring in the input, including the null string.
