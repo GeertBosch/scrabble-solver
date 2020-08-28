@@ -7,7 +7,7 @@ procedure Anagram is
 
    Board_Size : constant := 15;
 
-   Tiles : constant String := 
+   Tiles : constant String :=
       9 * 'A' & 2 * 'B' & 2 * 'C' & 4 * 'D' & 12 * 'E' & 2 * 'F' & 3 * 'G'
     & 2 * 'H' & 9 * 'I' & 1 * 'J' & 1 * 'K' & 4 * 'L' & 2 * 'M' & 6 * 'N' 
     & 8 * 'O' & 2 * 'P' & 1 * 'Q' & 6 * 'R' & 4 * 'S' & 6 * 'T' & 4 * 'U'
@@ -67,13 +67,14 @@ procedure Anagram is
       elsif Head (S) not in Letter then Get_Letters (Tail (S))
       else Head (S) & Get_Letters (Tail (S)));
 
-   Rack     : constant String := Upcase (Argument (1));
+   Rack     : constant String := 
+     (if Argument_Count > 0 then Upcase (Argument (1)) else "");
    Pattern  : constant String :=
      (if Argument_Count > 1 then Upcase (Argument (2)) else "*");
    Wildcard : constant Boolean := Has (Rack, '*');
    Letters  : constant String := Sort (Get_Letters (Rack & Pattern));
    Blanks   : constant Natural := Count (Rack, ' ') + Count (Rack, '?');
-   Max_Len  : constant Positive := Letters'Length + Blanks;
+   Max_Len  : constant Natural := Letters'Length + Blanks;
 
    pragma Debug (Text_IO.Put_Line ("Rack = " & Rack));
    pragma Debug (Text_IO.Put_Line ("Wildcard = " & Wildcard'Img));
@@ -157,11 +158,9 @@ procedure Anagram is
               and then Match_Rack (Sort (Word), Letters, Blanks)
               and then Match (Word, Pattern));
 
-   function Filter (List : String; Pattern : String) return String is
-     ("");
-
    procedure Usage is
    begin
+      Put_Line ("Usage:");
       Put_Line (Command_Name & " [rack] pattern");
       Put_Line (Command_Name & " --board");
    end Usage;
@@ -172,8 +171,7 @@ begin
    begin
       Open (Word_File, In_File, "words.txt");
    exception
-      when Name_Error => null;
-      when Use_Error =>
+      when others =>
          Put_Line (Standard_Error, "error reading words.txt");
          raise Error_Exit;
    end;
@@ -192,7 +190,7 @@ begin
 
    while not End_Of_File (Word_File) loop
       declare
-         Word : constant String := Get_Line (Word_File);
+         Word : constant String := Upcase(Get_Line (Word_File));
       begin
          if Filter (Word) then
             Put_Line (Word & Score (Word)'Img);
